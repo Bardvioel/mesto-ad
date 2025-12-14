@@ -13,10 +13,6 @@ export function enableValidation(settings) {
   const formList = Array.from(document.querySelectorAll(settings.formSelector));
   
   formList.forEach((formElement) => {
-    formElement.addEventListener('submit', (evt) => {
-      evt.preventDefault();
-    });
-
     setEventListeners(formElement, settings);
   });
 }
@@ -24,9 +20,7 @@ export function enableValidation(settings) {
 function setEventListeners(formElement, settings) {
   const inputList = Array.from(formElement.querySelectorAll(settings.inputSelector));
   const buttonElement = formElement.querySelector(settings.submitButtonSelector);
-  
-  toggleButtonState(inputList, buttonElement, settings);
-  
+    
   inputList.forEach((inputElement) => {
     inputElement.addEventListener('input', () => {
       checkInputValidity(formElement, inputElement, settings);
