@@ -1,4 +1,4 @@
-import { initialCards } from "./cards.js";
+import { getCardList, getUserInfo, setUserInfo, setAvatarInfo, addNewCard, delCard} from "./components/api.js";
 import { createCardElement, deleteCard, likeCard } from "./components/card.js";
 import { openModalWindow, closeModalWindow, setCloseModalWindowEventListeners } from "./components/modal.js";
 import { enableValidation, clearValidation } from "./components/validation.js";
@@ -13,7 +13,6 @@ const validationSettings = {
 };
 
 enableValidation(validationSettings);
-
 
 // DOM узлы
 const placesWrap = document.querySelector(".places__list");
@@ -42,6 +41,10 @@ const avatarFormModalWindow = document.querySelector(".popup_type_edit-avatar");
 const avatarForm = avatarFormModalWindow.querySelector(".popup__form");
 const avatarInput = avatarForm.querySelector(".popup__input_type_avatar");
 
+const deleteCardModalWindow = document.querySelector(".popup_type_remove-card");
+const deleteCardForm = deleteCardModalWindow.querySelector(".popup__form");
+
+
 const handlePreviewPicture = ({ name, link }) => {
   imageElement.src = link;
   imageElement.alt = name;
@@ -51,34 +54,61 @@ const handlePreviewPicture = ({ name, link }) => {
 
 const handleProfileFormSubmit = (evt) => {
   evt.preventDefault();
-  profileTitle.textContent = profileTitleInput.value;
-  profileDescription.textContent = profileDescriptionInput.value;
   closeModalWindow(profileFormModalWindow);
+  setUserInfo({
+    name: profileTitleInput.value,
+    about: profileDescriptionInput.value
+  })
+    .then((userData) => {
+      profileTitle.textContent = userData.name;
+      profileDescription.textContent = userData.about;  
+    })
+    .catch((err) => console.log(err));
 };
 
 const handleAvatarFromSubmit = (evt) => {
   evt.preventDefault();
-  profileAvatar.style.backgroundImage = `url(${avatarInput.value})`;
   closeModalWindow(avatarFormModalWindow);
+  setAvatarInfo({ avatar: avatarInput.value })
+    .then((userData) => profileAvatar.style.backgroundImage = `url(${userData.avatar})` )
+    .catch((err) => console.log(err));
 };
 
 const handleCardFormSubmit = (evt) => {
   evt.preventDefault();
-  placesWrap.prepend(
-    createCardElement(
-      {
-        name: cardNameInput.value,
-        link: cardLinkInput.value,
-      },
-      {
-        onPreviewPicture: handlePreviewPicture,
-        onLikeIcon: likeCard,
-        onDeleteCard: deleteCard,
-      }
-    )
-  );
   closeModalWindow(cardFormModalWindow);
+  addNewCard({
+    name: cardNameInput.value,
+    link: cardLinkInput.value,
+  })
+    .then((cardData) => {
+      placesWrap.prepend(
+        createCardElement(
+          {
+            name: cardData.name,
+            link: cardData.link,
+          },
+          {
+            onPreviewPicture: handlePreviewPicture,
+            onLikeIcon: likeCard,
+            onDeleteCard: deleteCard,
+          },
+          true
+        )
+      )})
+    .catch((err) => console.log(err));
 };
+
+const handleDeleteCard = (cardId, cardElement) => {
+  openModalWindow(deleteCardModalWindow);  
+  deleteCardForm.addEventListener("click", (evt) => {
+  closeModalWindow(deleteCardModalWindow)
+  evt.preventDefault();
+  delCard(cardId)
+    .then(() => deleteCard(cardElement))
+    .catch(err => console.log(err))
+})}
+
 
 // EventListeners
 profileForm.addEventListener("submit", handleProfileFormSubmit);
@@ -104,17 +134,38 @@ openCardFormButton.addEventListener("click", () => {
   clearValidation(cardForm, validationSettings);
 });
 
-initialCards.forEach((data) => {
-  placesWrap.append(
-    createCardElement(data, {
-      onPreviewPicture: handlePreviewPicture,
-      onLikeIcon: likeCard,
-      onDeleteCard: deleteCard,
-    })
-  );
-});
-
 const allPopups = document.querySelectorAll(".popup");
 allPopups.forEach((popup) => {
   setCloseModalWindowEventListeners(popup);
 });
+
+
+
+
+Promise.all([getCardList(), getUserInfo()])
+  .then(([cards, userData]) => {
+    profileTitle.textContent = userData.name;
+    profileDescription.textContent = userData.about;
+    profileAvatar.style.backgroundImage = `url(${userData.avatar})`;
+
+    const userId = userData._id;
+
+    cards.forEach((card) =>  {
+      const cardId = card._id;
+      const isAuthor = card.owner._id === userId;
+      placesWrap.append(
+        createCardElement(
+        card,
+        {
+          onPreviewPicture: handlePreviewPicture,
+          onLikeIcon: likeCard,
+          onDeleteCard: isAuthor ? (cardEl) => handleDeleteCard(cardId, cardEl) : undefined
+        },
+        isAuthor
+        )
+      )})
+  })
+  .catch((err) => {
+    console.log(err);
+  });
+
