@@ -1,4 +1,4 @@
-import { getCardList, getUserInfo, setUserInfo, setAvatarInfo, addNewCard, delCard} from "./components/api.js";
+import { getCardList, getUserInfo, setUserInfo, setAvatarInfo, addNewCard, delCard, changeLikeCardStatus } from "./components/api.js";
 import { createCardElement, deleteCard, likeCard } from "./components/card.js";
 import { openModalWindow, closeModalWindow, setCloseModalWindowEventListeners } from "./components/modal.js";
 import { enableValidation, clearValidation } from "./components/validation.js";
@@ -44,6 +44,14 @@ const avatarInput = avatarForm.querySelector(".popup__input_type_avatar");
 const deleteCardModalWindow = document.querySelector(".popup_type_remove-card");
 const deleteCardForm = deleteCardModalWindow.querySelector(".popup__form");
 
+const usersModalWindow = document.querySelector(".popup_type_info");
+const usersModalTitle = usersModalWindow.querySelector(".popup__title");
+const usersModalInfo = usersModalWindow.querySelector(".popup__info");
+const usersModalText = usersModalWindow.querySelector(".popup__text");
+const usersModalUsersList = usersModalWindow.querySelector(".popup__list");
+const logoElement = document.querySelector(".header__logo");
+
+
 
 const handlePreviewPicture = ({ name, link }) => {
   imageElement.src = link;
@@ -54,29 +62,34 @@ const handlePreviewPicture = ({ name, link }) => {
 
 const handleProfileFormSubmit = (evt) => {
   evt.preventDefault();
-  closeModalWindow(profileFormModalWindow);
+  profileForm.querySelector("button").textContent = "Сохранение...";
   setUserInfo({
     name: profileTitleInput.value,
     about: profileDescriptionInput.value
   })
     .then((userData) => {
       profileTitle.textContent = userData.name;
-      profileDescription.textContent = userData.about;  
+      profileDescription.textContent = userData.about;
+      closeModalWindow(profileFormModalWindow);
+      profileForm.querySelector("button").textContent = "Сохраненить"
     })
     .catch((err) => console.log(err));
 };
 
 const handleAvatarFromSubmit = (evt) => {
   evt.preventDefault();
-  closeModalWindow(avatarFormModalWindow);
+  avatarForm.querySelector("button").textContent = "Сохранение...";
   setAvatarInfo({ avatar: avatarInput.value })
-    .then((userData) => profileAvatar.style.backgroundImage = `url(${userData.avatar})` )
+    .then((userData) => {
+      profileAvatar.style.backgroundImage = `url(${userData.avatar})` 
+      closeModalWindow(avatarFormModalWindow);
+      avatarForm.querySelector("button").textContent = "Сохраненить"})
     .catch((err) => console.log(err));
 };
 
 const handleCardFormSubmit = (evt) => {
   evt.preventDefault();
-  closeModalWindow(cardFormModalWindow);
+  cardForm.querySelector("button").textContent = "Создание...";
   addNewCard({
     name: cardNameInput.value,
     link: cardLinkInput.value,
@@ -84,31 +97,51 @@ const handleCardFormSubmit = (evt) => {
     .then((cardData) => {
       placesWrap.prepend(
         createCardElement(
-          {
-            name: cardData.name,
-            link: cardData.link,
-          },
+          cardData,
           {
             onPreviewPicture: handlePreviewPicture,
-            onLikeIcon: likeCard,
-            onDeleteCard: deleteCard,
+            onLikeIcon: (likeButton, cardLikeCounter) => handleLikeCard(cardData._id, likeButton, false, cardLikeCounter),
+            onDeleteCard: (cardElement) => handleDeleteCard(cardData._id, cardElement)
           },
-          true
+          true,
+          false
         )
-      )})
+      )
+      closeModalWindow(cardFormModalWindow);
+      cardForm.querySelector("button").textContent = "Создать";
+    })
     .catch((err) => console.log(err));
 };
 
 const handleDeleteCard = (cardId, cardElement) => {
-  openModalWindow(deleteCardModalWindow);  
+  openModalWindow(deleteCardModalWindow);
   deleteCardForm.addEventListener("click", (evt) => {
-  closeModalWindow(deleteCardModalWindow)
+  deleteCardForm.querySelector("button").textContent = "Удаление...";
   evt.preventDefault();
   delCard(cardId)
-    .then(() => deleteCard(cardElement))
+    .then(() => {
+      deleteCard(cardElement)
+      closeModalWindow(deleteCardModalWindow)})
     .catch(err => console.log(err))
 })}
 
+const handleLikeCard = (cardId, likeButton, isLiked, cardLikeCounter) => {
+  changeLikeCardStatus(cardId, isLiked)
+    .then(() => {
+      likeCard(likeButton);
+      
+      let currentCount = parseInt(cardLikeCounter.textContent) || 0;
+      
+      if (!likeButton.classList.contains("card__like-button_is-active")) {
+        currentCount = Math.max(0, currentCount - 1);
+      } else {
+        currentCount = currentCount + 1;
+      }
+        
+        cardLikeCounter.textContent = currentCount;
+    })
+    .catch(err => console.log(err));
+}
 
 // EventListeners
 profileForm.addEventListener("submit", handleProfileFormSubmit);
@@ -147,21 +180,23 @@ Promise.all([getCardList(), getUserInfo()])
     profileTitle.textContent = userData.name;
     profileDescription.textContent = userData.about;
     profileAvatar.style.backgroundImage = `url(${userData.avatar})`;
-
     const userId = userData._id;
 
-    cards.forEach((card) =>  {
-      const cardId = card._id;
-      const isAuthor = card.owner._id === userId;
+    cards.forEach((cardData) =>  {
+      const cardId = cardData._id;
+      const isAuthor = cardData.owner._id === userId;
+      const isLiked = cardData.likes.some(like => like._id === userId);
+
       placesWrap.append(
         createCardElement(
-        card,
+        cardData,
         {
           onPreviewPicture: handlePreviewPicture,
-          onLikeIcon: likeCard,
-          onDeleteCard: isAuthor ? (cardEl) => handleDeleteCard(cardId, cardEl) : undefined
+          onLikeIcon: (likeButton, cardLikeCounter) => handleLikeCard(cardId, likeButton, isLiked, cardLikeCounter),
+          onDeleteCard: isAuthor ? (cardElement) => handleDeleteCard(cardId, cardElement) : undefined
         },
-        isAuthor
+        isAuthor,
+        isLiked
         )
       )})
   })
@@ -169,3 +204,72 @@ Promise.all([getCardList(), getUserInfo()])
     console.log(err);
   });
 
+
+
+const formatDate = (date) =>
+  date.toLocaleDateString("ru-RU", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+const createInfoString = (term, description) => {
+  const template = document.getElementById('popup-info-definition-template');
+  const infoItem = template.content.cloneNode(true);
+  
+  infoItem.querySelector('.popup__info-term').textContent = term;
+  infoItem.querySelector('.popup__info-description').textContent = description;
+  
+  return infoItem;
+};
+
+const createUserPreview = (user) => {
+  const template = document.getElementById('popup-info-user-preview-template');
+  const userItem = template.content.cloneNode(true);
+  const badge = userItem.querySelector('.popup__list-item');
+  
+  badge.textContent = user;
+  badge.classList.add('popup__list-item_type_badge');
+  
+  return userItem;
+};
+  
+const handleLogoClick = () => {
+  usersModalInfo.innerHTML = '';
+  usersModalUsersList.innerHTML = '';
+  usersModalTitle.textContent = '';
+  usersModalText.textContent = '';
+  
+  getCardList()
+    .then((cards) => {
+      const allUsers = new Set();
+      const userCardCount = {};
+
+      cards.forEach(card => {
+        const authorName = card.owner.name;
+        userCardCount[authorName] = (userCardCount[authorName] || 0) + 1;
+        allUsers.add(authorName)
+        card.likes.forEach(userLike => allUsers.add(userLike.name))
+      })
+
+      usersModalTitle.textContent = 'Статистика пользователей';
+
+      usersModalInfo.append(createInfoString('Всего карточек:', cards.length.toString()));
+      if (cards.length >= 2) {
+        usersModalInfo.append(createInfoString('Первая создана:', formatDate(new Date(cards[cards.length - 1].createdAt))));
+        usersModalInfo.append(createInfoString('Последняя создана:', formatDate(new Date(cards[0].createdAt))));
+      } else if (cards.length === 1) 
+        usersModalInfo.append(createInfoString('Карточка создана:', formatDate(new Date(cards[0].createdAt))));
+      usersModalInfo.append(createInfoString('Всего пользователей:', allUsers.size.toString()));
+      usersModalInfo.append(createInfoString('Максимум карточек от одного:', Math.max(...Object.values(userCardCount)).toString()));
+      
+      usersModalText.textContent = 'Все пользователи:';
+      allUsers.forEach(user => usersModalUsersList.append(createUserPreview(user)));
+      openModalWindow(usersModalWindow);
+    })
+    .catch((err) => {
+      console.log(err);
+    });
+};
+
+logoElement.addEventListener("click", handleLogoClick);
