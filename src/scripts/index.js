@@ -63,6 +63,7 @@ const handlePreviewPicture = ({ name, link }) => {
 const handleProfileFormSubmit = (evt) => {
   evt.preventDefault();
   profileForm.querySelector("button").textContent = "Сохранение...";
+  profileForm.querySelector("button").disabled = true;
   setUserInfo({
     name: profileTitleInput.value,
     about: profileDescriptionInput.value
@@ -71,25 +72,28 @@ const handleProfileFormSubmit = (evt) => {
       profileTitle.textContent = userData.name;
       profileDescription.textContent = userData.about;
       closeModalWindow(profileFormModalWindow);
-      profileForm.querySelector("button").textContent = "Сохраненить"
-    })
+      profileForm.querySelector("button").textContent = "Сохраненить";
+      profileForm.querySelector("button").disabled = false;})
     .catch((err) => console.log(err));
 };
 
 const handleAvatarFromSubmit = (evt) => {
   evt.preventDefault();
   avatarForm.querySelector("button").textContent = "Сохранение...";
+  avatarForm.querySelector("button").disabled = true;
   setAvatarInfo({ avatar: avatarInput.value })
     .then((userData) => {
       profileAvatar.style.backgroundImage = `url(${userData.avatar})` 
       closeModalWindow(avatarFormModalWindow);
-      avatarForm.querySelector("button").textContent = "Сохраненить"})
+      avatarForm.querySelector("button").textContent = "Сохраненить";
+      avatarForm.querySelector("button").disabled = false;})
     .catch((err) => console.log(err));
 };
 
 const handleCardFormSubmit = (evt) => {
   evt.preventDefault();
   cardForm.querySelector("button").textContent = "Создание...";
+  cardForm.querySelector("button").disabled = true;
   addNewCard({
     name: cardNameInput.value,
     link: cardLinkInput.value,
@@ -109,6 +113,7 @@ const handleCardFormSubmit = (evt) => {
       )
       closeModalWindow(cardFormModalWindow);
       cardForm.querySelector("button").textContent = "Создать";
+      cardForm.querySelector("button").disabled = false;
     })
     .catch((err) => console.log(err));
 };
@@ -117,11 +122,15 @@ const handleDeleteCard = (cardId, cardElement) => {
   openModalWindow(deleteCardModalWindow);
   deleteCardForm.addEventListener("click", (evt) => {
   deleteCardForm.querySelector("button").textContent = "Удаление...";
+  deleteCardForm.querySelector("button").disabled = true;
   evt.preventDefault();
   delCard(cardId)
     .then(() => {
       deleteCard(cardElement)
-      closeModalWindow(deleteCardModalWindow)})
+      closeModalWindow(deleteCardModalWindow)
+      deleteCardForm.querySelector("button").textContent = "Да";
+      deleteCardForm.querySelector("button").disabled = false;
+    })
     .catch(err => console.log(err))
 })}
 
